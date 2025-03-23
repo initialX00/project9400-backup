@@ -1,0 +1,48 @@
+깃허브에서 project탭 - 프로젝트 클릭 - view
+
+보드 생성
+
+create a draft
+
+경로지정
+
+-[ ] 프로젝트 이름
+
+create branch
+
+git fetch origin
+
+git checkout (브랜치 명)
+
+깃사용하기
+
+레포지토리에서 승인
+
+관리자가 이후 승인
+
+
+
+
+
+받을때
+git fetch origin 브랜치명
+git pull origin 브랜치명
+
+올릴때
+git fetch origin
+git checkout (브랜치 명)
+git add .
+
+
+
+
+
+작업물에
+유저1, 유저2가 각각 추가 작업한것은 합쳐서 머지가 된다.
+유저1이 추가 작업, 유저2가 삭제작업을 했으면 삭제와 추가가 머지가 된다.
+유저1이 기존작업물을 삭제하고, 유저2도 기존작업물을 수정했을경우 충돌이 된다.
+유저1, 유저2가 각각 기존작업물을 수정했을 경우 충돌이 된다.
+
+
+협동프로젝트에서 작업자 구별하기
+인텔리제이 세팅 - inlay hints - code vision - usages, code author 체크하기 

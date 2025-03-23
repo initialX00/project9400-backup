@@ -1,0 +1,43 @@
+프론트 브릿지 :: 내꺼 23-folder-merge3
+
+http://localhost:8080/swagger-ui/index.html#/
+
+
+api 서버와 클라이언트 간 서비스 상호작용
+query 데이터 조회 (읽기 전용)
+mutaion 데이터 변경 요청(추가,수정,삭제)
+hook 함수형 컴포넌트(api등)의 호출 결과를 상태로 관리.
+
+setSearchParams url파라미터의 객체, set을 하면 url변경
+
+
+
+    <!--
+    테이블 구상
+    (사이즈 옵션은 구현하지 않고 메뉴로 넣기)
+ㅇ메뉴이름 테이블 - 메뉴ID, 메뉴이름, 이미지
+ㅇ메뉴가격 테이블 - 가격ID, 메뉴가격, 메뉴ID
+ㅁ메뉴카테고리 테이블 - 카테고리ID, 카테고리이름, 메뉴ID
+    메뉴상태 테이블 - 상태ID, on(1)/off(0) (기본1), 메뉴ID
+    메뉴정보 테이블 - 정보ID, 원산지, 영양정보, 알레르기, 메뉴ID
+    햄버거옵션 테이블 - 햄버거옵션ID, 햄버거옵션 종류
+    사이드옵션 테이블 - 사이드옵션ID, 딥핑소스 종류
+    커피옵션 테이블 - 시럽옵션Id, 시럽 및 샷 종류
+    디저트옵션 테이블 - 디저트옵션ID, 디저스소스 종류
+    -->
+
+
+                        {selectCategories.map((categoryOption) => (
+                        <MenuItem 
+                            key={categoryOption.value} 
+                            value={categoryOption.value}
+                            style={{ //목록 스타일
+                                width: '12rem',
+                                minHeight: '3rem',
+                                fontSize: '1.4rem', 
+                              }}
+			 {categoryOption.label}
+                              />
+                           
+                        </MenuItem>
+                        ))}
