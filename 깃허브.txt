@@ -27,6 +27,8 @@ git checkout (브랜치 명)
 받을때
 git fetch origin 브랜치명
 git pull origin 브랜치명
+git fetch
+git checkout 브랜치 명 (브런치명 안 맞을 경우)
 
 올릴때
 git fetch origin
