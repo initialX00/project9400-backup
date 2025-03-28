@@ -1,274 +1,628 @@
-/** @jsxImportSource @emotion/react */
-import { useEffect, useState } from "react";
-import * as s from "./style";
-import { Checkbox } from "@mui/material";
-import { useAddMenuMutation, useDeleteMenuMutation } from "../../../mutations/menuMutation";
-import useMenuData, { useMenuDetail } from "../../../hooks/menu/getMenuHooks";
-import ImageModal from "../AdminMenuImagine/AdminMenuImagine";
-import { useSearchParams } from "react-router-dom";
+/**@jsxImportSource @emotion/react */
+import { GoChevronLeft, GoChevronRight } from 'react-icons/go';
+import * as s from './style';
+import React, { useEffect, useState } from 'react';
+import { MenuItem, Select } from '@mui/material';
+import { useSearchParams } from 'react-router-dom';
+import { useAllMenuList, useGetCategories } from '../../../queries/AdminQuery/AdminMenuBoardQuery';
+import { useUpdateIsPosureMutation } from '../../../mutations/adminMutaion';
+import ReactModal from 'react-modal';
+import AdminMenuInfoModal from '../../../components/Modal/AdminMenuInfoModal/AdminMenuInfoModal';
 
-
-function AdminProductManage() {
+function AdminMenuPage(props) {
     const [ searchParams, setSearchParams ] = useSearchParams();
-    const [selectedMenu, setSelectedMenu] = useState(!!searchParams.get("menuId") ? parseInt(searchParams.get("menuId")) : 1);
-    const [isEditing, setIsEditing] = useState(false);
-    const [modalOpen, setModalOpen] = useState(false);
-    const [imageList, setImageList] = useState([]);
-    const [selectedImageType, setSelectedImageType] = useState("");
+    
+    const page = parseInt(searchParams.get("page") || "1"); //현재 페이지번호 파라미터
+    const [ totalPages, setTotalPages ] = useState(1); //총페이지 수 상태
+    const [ category, setCategory ] = useState(searchParams.get("category") || "전체"); //카테고리 상태 및 파라미터
+    const [ pageNumbers, setPageNumbers ] = useState([]); //페이지 번호 목록 상태
 
-    const [formData, setFormData] = useState({
-        menuName: "",
-        menuCategory: "",
-        menuSequence: "",
-        isExposure: 1,
-        singleImg: null,
-        setImg: null,
-        prices: [
-            { size: "M", price: "", discountPrice: "" },
-            { size: "L", price: "", discountPrice: "" },
-        ],
-    });
+    const allMenuList = useAllMenuList(); //모든 메뉴 불러오기
+    const { data: searchMenuList, isLoading: isMenuLoading } = allMenuList; //모든 메뉴 배열에 담기
+    
+    // const updateIsExposureMutation = useUpdateIsPosureMutation(); //노출여부 뮤태이션
 
-    const { data: menus = [], error, isLoading } = useMenuData();
-    const { data: menuDetail } = useMenuDetail(selectedMenu);
-    const addMenuMutation = useAddMenuMutation();
-    const deleteMenuMutation = useDeleteMenuMutation();
+    const [ infoModalOpen, setInfoModalOpen ] = useState(false); //모달 열림 상태
+    const [ infoModalDate, setInfoModalDate ] = useState(1); //모달에 전달할 메뉴데이터
 
+
+    //카테고리에 맞는 메뉴 목록 불러오기
+    const filteredMenuList = (searchMenuList?.data || []).filter(menu =>
+        category === "전체" || menu.menuCategory === category
+    );
+
+    //필요한 목록 불러오기
+    const renderMenuList = () => {
+
+        //한 페이지에 담길 인덱스
+        const startIndex = (page - 1) * 10;
+        const endIndex = startIndex + 10;
+        const churnkededMenuList = filteredMenuList.slice(startIndex, endIndex);
+
+        //메뉴 출력
+        return churnkededMenuList.map((menu) => (
+            <li key={menu.menuId} onClick={() => handleInfoModalOnClick(menu.menuId)}>
+                <div css={s.numBox}>{menu.menuId}</div>
+                <div css={s.nameBox}>{menu.menuName}</div>
+                <div css={s.priceBox}>{menu.menuPrice[0].menuPrice}</div>
+                {/* <div css={s.exBox}>
+                    <input 
+                        type='checkbox' 
+                        checked={menu.isExposure === 1}
+                        onChange={() => {
+                            const newCheckedState = menu.isExposure === 1 ? 0 : 1;
+                            handleChangeIsExposureOnClick(menu.menuId, newCheckedState);
+                        }}
+                    />
+                </div> */}
+            </li>
+        ));
+    };
+
+        //메뉴 클릭 시 모달 작동
+        const handleInfoModalOnClick = (menuId) => {
+            setInfoModalDate(menuId); //모달에 데이터 전달
+            setInfoModalOpen(true); //모달 열기
+        }
+
+    // //노출여부 변경 및 목록 다시 불러오기
+    // const handleChangeIsExposureOnClick = async (menuId, isExposure) => {
+    //     await updateIsExposureMutation.mutateAsync({ "menuId": menuId, "isExposure": isExposure });
+    //     allMenuList.refetch();
+    // }
+
+    //카테고리 설정
+    const { data: getCategory } = useGetCategories();//카테고리 백에서 불러오기
+    const selectCategories = [ //백에서 불러온거랑 합치기
+        {label: "전체", value: "전체"},
+        ...(getCategory?.data.map((categories) => ({
+            label: categories,
+            value: categories
+        })) || [])
+    ];
+        
+    //셀렉트에서 선택된 카테고리로 변경
+    const handleSelectCategoryOnChange = (option) => {
+        const choiceCategory = option.target.value;
+        setCategory(choiceCategory); //상태 업데이트
+        searchParams.set("category", option.target.value); //파라미터 값 변경
+        searchParams.set("page", 1);
+        setSearchParams(searchParams); //파라미터 업데이트
+    }
+
+    //클릭된 페이지 번호 상태에 적용
+    const handlePageNumbersOnClick = (pageNumber) => {
+        searchParams.set("page", pageNumber);
+        setSearchParams(searchParams);
+    }
+
+    //페이지 메커니즘.
     useEffect(() => {
-        if (!selectedMenu && Array.isArray(menus) && menus.length > 0 && menus[0]?.menuId) {
-            setSelectedMenu(menus[0].menuId);
+        if(!allMenuList?.isLoading && filteredMenuList.length > 0) {
+            const totalPage = Math.ceil((filteredMenuList.length || 0) / 10); //총페이지 수
+            setTotalPages(totalPage);
+            const pageStartIndex = Math.floor((page - 1) / 5) * 5 + 1; //시작 페이지번호
+            const pageEndIndex = pageStartIndex + 4 > totalPages ? totalPages : pageStartIndex + 4; //끝 페이지번호
+
+            let newPageNumbers = []; //페이지 번호 목록
+            for(let i = pageStartIndex; i <= pageEndIndex; i++ ) {
+                newPageNumbers = [...newPageNumbers, i];
+            }
+            setPageNumbers(newPageNumbers);
         }
-    }, [menus]);
+    }, [searchParams, category, totalPages, isMenuLoading]);
 
-    useEffect(() => {
-        if (!menuDetail || typeof menuDetail !== "object") {
-            console.warn("⚠️ [useEffect] 메뉴 데이터가 올바르지 않습니다.", menuDetail);
-            return;
-        }
 
-        console.log("🔥 [useEffect] 불러온 메뉴 정보: ", menuDetail);
-
-        setFormData({
-            menuCategory: menuDetail.menuCategory || "",
-            menuName: menuDetail.menuName || "",
-            menuSequence: menuDetail.menuSequence || 0,
-            isExposure: menuDetail.isExposure ?? 1,
-            singleImg: menuDetail.singleImg || null,
-            setImg: menuDetail.setImg || null,
-            prices: Array.isArray(menuDetail.menuPrice) 
-            ? menuDetail.menuPrice.map((price) => ({
-                size: price.size,
-                price: price.menuPrice || "",
-                discountPrice: price.discountPrice || "",
-            }))
-        : [],});
-    }, [menuDetail]);
-
-    // 이미지 모달 열기
-    const handleOpenModalOnClick = (type) => {
-        setSelectedImageType(type);
-        const selectedImages =
-            type === "single"
-            ? menus.map((menu) => menu.singleImg).filter(Boolean)
-            : menus.map((menu) => menu.setImg).filter(Boolean);
-        setImageList(selectedImages);
-        setModalOpen(true);
-        };
-
-    // 이미지 선택 시 formData에 반영
-    const handleSelectImage = (imgUrl) => {
-        setFormData((prev) => ({
-            ...prev,
-            [selectedImageType === "single" ? "singleImg" : "setImg"]: imgUrl,
-        }));
-        setModalOpen(false);
-    };
-
-    const handleInputValueOnChange = (e) => {
-        const { name, value, type, checked } = e.target;
-
-        if (type === "checkbox") {
-            setFormData((prev) => ({
-                ...prev,
-                [name]: checked ? 1 : 0,
-            }));
-        return;
-        }
-
-        if (name === "M" || name === "L") {
-            setFormData((prev) => ({
-                ...prev,
-                prices: prev.prices.map((p) =>
-                p.size === name ? { ...p, price: value } : p
-            ),}));
-            return;
-        }
-
-        setFormData((prev) => ({
-            ...prev,
-            [name]: value,
-        }));
-    };
-
-    const handleSubmitMenuOnClick = async () => {
-        try {
-            await addMenuMutation.mutateAsync(formData);
-            alert("메뉴가 추가되었습니다.");
-        } catch (error) {
-            console.error("메뉴 추가 실패:", error);
-            alert("메뉴 추가 중 오류 발생!");
-        }
-    };
-
-    const handleDeleteMenuOnClick = async () => {
-        if (!selectedMenu) return alert("삭제할 메뉴를 선택하세요.");
-
-        try {
-            await deleteMenuMutation.mutateAsync(selectedMenu);
-            alert("메뉴가 삭제되었습니다.");
-        } catch (error) {
-            console.error("메뉴 삭제 실패:", error);
-            alert("메뉴 삭제 중 오류 발생!");
-        }
-    };
-
+    //console.log(searchMenuList);
+    
     return (
         <div css={s.container}>
-            {/* 메뉴 선택 드롭다운 */}
-            <div css={s.dropdownContainer}>
-                <select
-                onChange={(e) => setSelectedMenu(Number(e.target.value))}
-                css={s.dropdown}
-                value={selectedMenu}
-                >
-                <option value="">메뉴를 선택해주세요</option>
-                {!isLoading && menus.length > 0 ? (
-                    menus?.filter(menu => menu && menu.menuId).map(menu => (
-                    <option key={menu.menuId} value={menu.menuId}>
-                        {menu.menuName}
-                    </option>
-                    ))              
-                ) : (
-                    <option disabled>메뉴가 없습니다</option>
-                )}
-                </select>
-            </div>
-
-            {/* 상품 정보 입력 */}
-            <div css={s.productContainer}>
-                <div css={s.imageCon}>
-                    <label css={s.imageBox} onClick={() => handleOpenModalOnClick("single")}>
-                    {formData.singleImg ? (
-                        <img src={formData.singleImg} alt="Single" />
-                    ) : (
-                        <span>단품 또는 M사이즈</span>
-                    )}
-                    </label>
-                    <label css={s.imageBox} onClick={() => handleOpenModalOnClick("set")}>
-                    {formData.setImg ? (
-                        <img src={formData.setImg} alt="Set" />
-                    ) : (
-                        <span>세트 또는 L사이즈</span>
-                    )}
-                    </label>
-                </div>
-    
-                <ImageModal
-                    isOpen={modalOpen}
-                    onClose={() => setModalOpen(false)}
-                    images={imageList}
-                    onSelect={handleSelectImage}
-                />
-    
-                <div css={s.inputGroup}>
-                    <div>
-                        <label css={s.label}>상품명</label>
-                        <input
-                            type="text"
-                            css={s.input}
-                            name="menuName"
-                            value={formData.menuName}
-                            onChange={handleInputValueOnChange}
-                            disabled={selectedMenu !== null}
-                        />
-                    </div>
-                    <div>
-                        <label css={s.label}>카테고리</label>
-                        <input
-                            type="text"
-                            css={s.input}
-                            name="menuCategory"
-                            value={formData.menuCategory}
-                            onChange={handleInputValueOnChange}
-                            disabled={selectedMenu !== null}
-                        />
-                    </div>
-                    <div>
-                        <label css={s.label}>상품 우선 순위</label>
-                        <input
-                            type="number"
-                            css={s.input}
-                            name="menuSequence"
-                            value={formData.menuSequence}
-                            onChange={handleInputValueOnChange}
-                            disabled={selectedMenu !== null}
-                        />
-                    </div>
-                    <div>
-                        <label css={s.label}>노출 여부</label>
-                        <Checkbox
-                            name="isExposure"
-                            checked={formData.isExposure === 1}
-                            onChange={handleInputValueOnChange}
-                            disabled={!isEditing}
-                        />
-                    </div>
-                    <div>
-                        <label css={s.label}>단품/M 사이즈 가격</label>
-                        <input
-                            type="number"
-                            name="M"
-                            value={
-                            formData.prices.find((p) => p.size === "M")?.price ?? ""
-                            }
-                            onChange={handleInputValueOnChange}
-                            css={s.input}
-                            disabled={selectedMenu !== null}
-                        />
-                    </div>
-                    <div>
-                        <label css={s.label}>세트/L 사이즈 가격</label>
-                        <input
-                            type="number"
-                            name="L"
-                            value={
-                            formData.prices.find((p) => p.size === "L")?.price ?? ""
-                            }
-                            onChange={handleInputValueOnChange}
-                            css={s.input}
-                            disabled={selectedMenu !== null}
-                        />
-                    </div>
-                </div>
-            </div>
-
-            <div css={s.buttonGroup}>
-                <button onClick={() => setIsEditing(true)} css={s.button}>
-                    편집
-                </button>
-                <button
-                    onClick={handleSubmitMenuOnClick}
-                    css={s.button}
-                    disabled={!isEditing}
+            <div css={s.header}>
+                <span>메뉴관리</span>
+                <div>
+                    <Select 
+                        options={selectCategories}
+                        style={{ //선택된값 스타일
+                            width: '12rem',
+                            minHeight: '4rem',
+                            fontSize: '1.4rem',
+                            fontWeight: '600',
+                          }}
+                        value={category}
+                        onChange={handleSelectCategoryOnChange}
                     >
-                    추가
+                        {selectCategories.map((categoryOption) => (
+                        <MenuItem 
+                            key={categoryOption.value} 
+                            value={categoryOption.value}
+                            style={{ //목록 스타일
+                                width: '12rem',
+                                minHeight: '3rem',
+                                fontSize: '1.4rem', 
+                              }}
+                              >
+                            {categoryOption.label}
+                        </MenuItem>
+                        ))}
+                    </Select>
+                </div>
+            </div>
+
+            <div>
+                <div css={s.title}>{category !== '전체' ? `${category} 리스트` : "전체 리스트"}</div>
+                <ul css={s.menuListContainer}>
+                    <li>
+                        <div css={s.numBox}>NO.</div>
+                        <div css={s.nameBox}>Name</div>
+                        <div css={s.priceBox}>Price</div>
+                        {/* <div css={s.exBox}>On/Off</div> */}
+                    </li>
+                    { renderMenuList() }
+                </ul>
+                <ReactModal 
+                    isOpen={infoModalOpen} 
+                    onRequestClose={() => setInfoModalOpen(false)} //모달 밖을 누르면 닫힘
+                    style={{
+                        overlay: {
+                            display: "flex",
+                            justifyContent: "center",
+                            alignItems: "center",
+                            backgroundColor: "#00000044"
+                        },
+                        content: {
+                            position: "static",
+                            boxSizing: "border-box",
+                            borderRadius: "1.5rem",
+                            height: "85rem",
+                            width: "120rem",
+                        }
+                    }}
+                >
+                    <AdminMenuInfoModal setOpen={setInfoModalOpen} menuId={infoModalDate} />
+                </ReactModal>
+            </div>
+
+            <div css={s.footer}>
+                <button disabled={page === 1} onClick={() => handlePageNumbersOnClick(page - 1)}>
+                    <GoChevronLeft/>
                 </button>
-                <button onClick={handleDeleteMenuOnClick} css={s.button}>
-                삭제
+                {
+                    pageNumbers.map(number =>
+                        <button key={number} css={s.pageNum(page === number)} onClick={() => handlePageNumbersOnClick(number)}>
+                            <span>{number}</span>
+                        </button>
+                    )
+                }
+                <button disabled={page === totalPages} onClick={() => handlePageNumbersOnClick(page + 1)}>
+                    <GoChevronRight />
                 </button>
             </div>
         </div>
     );
 }
 
-export default AdminProductManage;
+export default AdminMenuPage;
+
+
+/**@jsxImportSource @emotion/react */
+import { useNavigate } from 'react-router-dom';
+import { useUpdateIsPosureMutation } from '../../../mutations/adminMutaion';
+import { useInfoMenuById } from '../../../queries/AdminQuery/AdminMenuBoardQuery';
+import * as s from './style';
+
+function AdminMenuInfoModal({ menuId }) {
+
+    const navigate = useNavigate();
+    const getInfoMenuById = useInfoMenuById(menuId);
+
+    console.log(getInfoMenuById);
+
+    const updateIsExposureMutation = useUpdateIsPosureMutation(); //노출여부 뮤태이션
+
+        //노출여부 변경 및 목록 다시 불러오기
+    const handleChangeIsExposureOnClick = async (menuId, isExposure) => {
+        await updateIsExposureMutation.mutateAsync({ "menuId": menuId, "isExposure": isExposure });
+        getInfoMenuById.refetch();
+    }
+    
+    //product페이지로 전달
+    const handleButtonOnClick = (buttonName, menuData) => {
+        if(buttonName === 'product') {
+            navigate(`/admin/main/product/manage?menuId=${menuData}`);  
+        }
+        if(buttonName === 'info') {
+            navigate(`/admin/main/option/`); 
+        }
+    //AdminProductManage수정할거 - 나중에 메뉴 상세정보 변경에도 사용해야댐.
+    // const [ searchParams, setSearchParams ] = useSearchParams();
+    // const [selectedMenu, setSelectedMenu] = useState(!!searchParams.get("menuId") ? parseInt(searchParams.get("menuId")) : 1);
+    //
+    //
+    // return (
+    //     <div css={s.container}>
+    //         {/* 메뉴 선택 드롭다운 */}
+    //         <div css={s.dropdownContainer}>
+    //             <select
+    //             onChange={(e) => setSelectedMenu(Number(e.target.value))}
+    //             css={s.dropdown}
+    //             value={selectedMenu}
+    //             >
+    }
+
+    return (
+        <div>
+            <div css={s.modalcontainer}>
+                <div css={s.text}>제품정보</div>
+                <div css={s.modalhead}>
+                    <div css={s.headleft}>
+                        <div>
+                            <img src={getInfoMenuById?.data?.data?.singleImg} alt="" />
+                        </div>
+                        <div>
+                            size : {getInfoMenuById?.data?.data?.size}
+                        </div>
+                    </div>
+                    <div css={s.headright}>
+                        <div className="onoff">
+                            <div>ON/OFF</div>
+                            <div css={s.exBox}>
+                                <input 
+                                    type='checkbox' 
+                                    checked={getInfoMenuById?.data?.data?.isExposure === 1}
+                                    onChange={() => {
+                                        const newCheckedState = getInfoMenuById?.data?.data?.isExposure === 1 ? 0 : 1;
+                                        handleChangeIsExposureOnClick(getInfoMenuById?.data?.data?.menuId, newCheckedState);
+                                    }}
+                                />
+                            </div>
+                        </div>
+                        <div className="idname">
+                            <div className="line">
+                                <div>메뉴id</div>
+                                <div>{getInfoMenuById?.data?.data?.menuId}</div>
+                            </div>
+                            <div className="line">
+                                <div>메뉴이름</div>
+                                <div>{getInfoMenuById?.data?.data?.menuName}</div>
+                            </div>
+                            <div className="line">
+                                <div>메뉴가격</div>
+                                <div>{getInfoMenuById?.data?.data?.menuPrice}</div>
+                            </div>
+                            <div className="line">
+                                <div>카테고리</div>
+                                <div>{getInfoMenuById?.data?.data?.menuCategory}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div css={s.modalbody}>
+                    <div css={s.text}>제품 상세 정보</div>
+                    <div css={s.bodyup}>
+                        <div className="line">
+                            <div>영양소</div>
+                            <div>함량</div>
+                            <div>영양소 기준치</div>
+                        </div>
+                        <div className="line">
+                            <div>중량(g)</div>
+                            <div>{getInfoMenuById?.data?.data?.weightG}g</div>
+                            <div>-</div>
+                        </div>
+                        <div className="line">
+                            <div>중량(ml)</div>
+                            <div>{getInfoMenuById?.data?.data?.volumeMl}ml</div>
+                            <div>-</div>
+                        </div>
+                        <div className="line">
+                            <div>열량</div>
+                            <div>{getInfoMenuById?.data?.data?.calories}kcal</div>
+                            <div>-</div>
+                        </div>
+                        <div className="line">
+                            <div>당</div>
+                            <div>{getInfoMenuById?.data?.data?.sugars}g</div>
+                            <div>{Math.round((getInfoMenuById?.data?.data?.sugars / 100) * 100)}%</div>
+                        </div>
+                        <div className="line">
+                            <div>단백질</div>
+                            <div>{getInfoMenuById?.data?.data?.protein}g</div>
+                            <div>{Math.round((getInfoMenuById?.data?.data?.protein / 55) * 100)}%</div>
+                        </div>
+                        <div className="line">
+                            <div>포화지방</div>
+                            <div>{getInfoMenuById?.data?.data?.saturatedFat}g</div>
+                            <div>{Math.round((getInfoMenuById?.data?.data?.saturatedFat / 54) * 100)}%</div>
+                        </div>
+                        <div className="line">
+                            <div>나트륨</div>
+                            <div>{getInfoMenuById?.data?.data?.sodium}mg</div>
+                            <div>{Math.round((getInfoMenuById?.data?.data?.sodium / 2000) * 100)}%</div>
+                        </div>
+                        <div className="line">
+                            <div>카페인</div>
+                            <div>{getInfoMenuById?.data?.data?.caffeine}mg</div>
+                            <div>{Math.round((getInfoMenuById?.data?.data?.caffeine / 400) * 100)}%</div>
+                        </div>
+                    </div>
+                    <div css={s.bodydown}>
+                        <div>원산지</div>
+                        {getInfoMenuById?.data?.data?.menuOrigin?.split('/').map((item, index) => (
+                            <div key={index}>{item}</div>))
+                        }
+                    </div>
+                </div>
+                <div css={s.modalfooter}>
+                    <button onClick={() => handleButtonOnClick('product', getInfoMenuById?.data?.data?.menuId)}>제품 정보 변경</button>
+                    <button onClick={() => handleButtonOnClick('info', getInfoMenuById?.data?.data?.menuId)}>제품 상세정보 변경</button>
+                </div>
+
+            </div>
+        </div>
+    );
+}
+
+export default AdminMenuInfoModal;
+
+
+import { css } from "@emotion/react";
+
+export const modalcontainer = css`
+    display: flex;
+    flex-direction: column;
+`;
+
+export const text = css`
+    margin: 1rem 0 1rem 0rem;
+    border-bottom: 0.5rem dashed #00000022;
+    padding-bottom: 1rem;
+    font-size: 2.5rem;
+    font-weight: 600;
+    text-align: center;
+    width: 10em;
+`;
+
+export const modalhead = css`
+    display: flex;
+    justify-content: space-around;
+    margin-bottom: 2.5rem;
+    font-size: 2.5rem;
+    font-weight: 500;
+`;
+
+export const headleft = css`
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-grow: 1;
+
+    & > div > img {
+        border-radius: 1.5rem;
+    }
+`;
+
+export const headright = css`
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    flex-grow: 3;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+
+    .onoff {
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+        border-bottom: .3rem solid #00000055;
+        padding: 0 0 2rem 0;
+    }
+
+    .idname {
+        display: flex;
+        padding: 2rem 0;
+        
+        .line {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border-right: .3rem solid #00000055;
+            flex-grow: 1;
+
+            
+            & div {
+                margin: 1rem 0;
+            }
+        }
+        
+        .line:nth-last-of-type(1) {
+            border: none;
+        }
+    }
+`;
+
+
+export const exBox = css`
+    display: flex;
+    position: relative;
+    padding: 0;
+    width: 7rem;
+    
+
+    & input {
+        appearance: none; /* 기본 체크박스 스타일을 제거 */
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin: 0;
+        border-radius: 0.2rem; 
+        border: 0.1rem solid #333333; 
+        height: 1.8rem;
+        width: 1.8rem;
+        background-color: #eeeeee; 
+        transition: all 0.15s ease-in-out;
+
+        &:checked {
+            border-radius: 35%; 
+            border: none;
+            background-color: #0d56dd;
+            transform: scale(2);
+        }
+
+        &:checked::after {
+            content: '✓';  /* V 모양을 텍스트로 표시 */
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: white;
+        }
+    }
+`;
+
+
+export const modalbody = css`
+    display: flex;
+    flex-direction: column;
+`;
+
+export const bodyup = css`
+    display: flex;
+    margin: 1rem;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    
+    
+    .line {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        border-right: 0.1rem dashed #00000055;
+        font-size: 2.5rem;
+        width: 100%;
+        text-align: center;
+
+        & > div {
+            margin-top: 1.2rem;
+
+        }
+
+    }
+
+    .line:nth-of-type(1) {
+        min-width: 18rem;
+        font-size: 2.5rem;
+        font-weight: 600;
+        border-right: 0.3rem solid #00000055;
+    
+    }
+    .line:nth-last-of-type(1) {
+        border: none;
+    }
+`;
+
+export const bodydown = css`
+    display: flex;
+    align-items: center;
+    margin: 2rem 0 2rem 3.5rem;
+    font-size: 2.5rem;
+
+    & div {
+        border-left: 0.1rem dashed #00000055;
+        padding: 0 1.5rem;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        width: fit-content;
+    }
+
+    & div:nth-of-type(1) {
+        border: none;
+        padding-right: 2rem;
+        font-size: 3rem;
+        font-weight: 500;
+        overflow: unset;
+    }
+`;
+
+export const modalfooter = css`
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    margin-top: 2rem;
+    padding: 0 10rem;
+
+    & button {
+        border-radius: 1rem;
+        height: 8rem;
+        width: 25rem;
+        font-size: 2rem;
+        font-weight: 800;
+        background-color: #ffd900aa;
+
+        &:hover {
+            background-color: #cfb000aa;
+        }
+
+        &:active {
+            background-color: #a58c00;
+        }
+    }
+
+`;
+
+
+/**@jsxImportSource @emotion/react */
+import * as s from './style';
+import React, { useState } from 'react';
+
+function AdminOrderPage(props) {
+    const [ payments, setPayments ] = useState([]);
+
+    const PAYSTATUS = { //status의 값을 보고 메세지 띄우기
+        "PAID": "결제완료",
+        "FAILED": "결제실패",
+        "CANCELLED": "결제취소",
+        "READY": "결제 중"
+    }
+
+    const products = {
+
+    }
+
+    //날짜 선택
+    const today = () => {
+        const date = new Date();
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0'); //padStart로 2자리수로 만들기
+        const today = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${today}`;
+    }
+
+    const [selectedDate, setSelectedDate ] = useState(today());
+
+    const handleSelectDateOnChange = (e) => {
+        setSelectedDate(e.target.value);
+    }
+
+    return (
+        <div css={s.container}>
+            <div css={s.head}>
+                <span>매출관리</span>
+                <label htmlFor="date">날짜를 선택하세요</label>
+                <div css={s.calandar}>
+                    <input type="date"
+                    id="date"
+                    max={today()}
+                    value={selectedDate}
+                    onChange={handleSelectDateOnChange}
+                    />
+                </div>
+            </div>  
+
+            <div>
+                표, 리스트
+            </div>
+        </div>
+    );
+}
+
+export default AdminOrderPage;
+
