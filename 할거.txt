@@ -25,19 +25,33 @@ style={}내부의 {}를  React가 객체 형태로 CSS 스타일을 인식하기
 
 
 ===할거===
-결제 취소 상태의 버튼에 마우스 접근 시 사유 띄우기
-url파라미터 숨기기
-
-
-
-한국표준시 kst 2025-03-28T15:30:45+09:00
+Google Cloud Translation API로 번역
 
 안녕 난 초보개발자야. 내가 보여주는 코드를 통해, 주석을 달며 한글로 자세히 설명해줘.
 
+                <div>
+                    <span>주문번호</span>
+                    <span>주문명</span>
+                    <span>총액</span>
+                    <span>결제시간</span>
+                    <span>결제상태</span>
+                </div> 
+해당 코드뿐만 아니라 다른 페이지에서도 번역이 가능한 함수를 만들려면 어떻게해야돼? 번역API를 사용해줘
 
-                        <div>
-                            <h3 css={s.modalBasich3}>세트(사이즈) 선택</h3>
-                            <button>상세 정보</button>
-                        </div>
 
 
+data.items[0].products[0].id
+
+menuData.menuPrice[0].size의 size도 onClick함수에 전달하고 싶어.
+<button onClick={() => handleMenuInfoModalButtonOnClick(menuData.find(item => item.menuName === menu.name)?.menuId)}>상세<br></br>정보</button>
+
+
+
+
+data.data[0].menuName
+
+
+
+price를 확인해서 길이가 1보다 크면 스위치 보이기.
+길이가 1보다 크면 스위치에 따라 M, L 선택.
+스위치에 따라 M과 L 텍스트가 다르게 출력.
