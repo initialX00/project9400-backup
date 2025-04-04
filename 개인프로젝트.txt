@@ -1,0 +1,85 @@
+개구리
+
+
+회원가입
+로그인
+OAuth2
+
+비로그인도 일부 플레이 가능. (저장데이터가 있더라도 비로그인 시 로그인 컨텐츠 접근불가)
+로그인 시 결제 필요.
+클리어한 스테이지 저장. (비로그인과 로그인의 메커니즘이 다른가?)
+
+스테이지에 필요한 단어제공.
+단어 기입 시 화면 전환.
+
+
+
+import React, { useState } from 'react';
+
+const DynamicCSSInput = () => {
+  const [cssCode, setCssCode] = useState('');
+  const [styleApplied, setStyleApplied] = useState({});
+
+  const handleInputChange = (event) => {
+    const value = event.target.value;
+    setCssCode(value);
+  };
+
+  const applyCSS = () => {
+    try {
+      const styleObj = parseCSS(cssCode);
+      setStyleApplied(styleObj);
+    } catch (error) {
+      alert('유효한 CSS 코드가 아닙니다!');
+    }
+  };
+
+  // CSS 문자열을 객체로 변환하는 함수
+  const parseCSS = (cssString) => {
+    const styleObj = {};
+    const cssRules = cssString.split(';').map(rule => rule.trim()).filter(Boolean);
+    
+    cssRules.forEach(rule => {
+      const [property, value] = rule.split(':').map(str => str.trim());
+      if (property && value) {
+        styleObj[property] = value;
+      }
+    });
+    
+    return styleObj;
+  };
+
+  return (
+    <div style={{ padding: '20px' }}>
+      <h1>CSS 코드 입력</h1>
+      <label htmlFor="cssInput">CSS 코드 입력 (예: display: flex; color: red;): </label>
+      <input
+        type="text"
+        id="cssInput"
+        value={cssCode}
+        onChange={handleInputChange}
+        placeholder="CSS 코드 입력"
+        style={{ padding: '5px', fontSize: '14px', width: '300px' }}
+      />
+      <button onClick={applyCSS} style={{ padding: '5px', marginLeft: '10px' }}>
+        스타일 적용
+      </button>
+
+      <div
+        id="styledBox"
+        style={{
+          ...styleApplied,
+          marginTop: '20px',
+          padding: '20px',
+          border: '1px solid #ccc',
+          backgroundColor: '#f9f9f9',
+          transition: 'all 0.3s ease',
+        }}
+      >
+        스타일이 적용된 박스
+      </div>
+    </div>
+  );
+};
+
+export default DynamicCSSInput;
